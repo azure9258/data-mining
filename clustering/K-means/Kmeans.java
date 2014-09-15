@@ -16,8 +16,12 @@ public class Kmeans {
 	public static final String file1 = "1.3_Clustering.txt";
 	public static final String file2 = "2.3_Clustering.txt";
 
+	static List<List<point>> clusterResult;
 	static List<point> points = new ArrayList<point>();
+	static List<point> centroids = new ArrayList<point>();
+	static List<point> newCentroids = new ArrayList<point>();
 	static PrintWriter output = null;
+	static int Nclusters;
 	static int pointDimension = 0;
 	
 	public static void main(String[] args) {
@@ -44,8 +48,161 @@ public class Kmeans {
 			System.out.println("Please input correct number. ( 1 or 2 )");
 			System.exit(0);
 		}
+		
+		System.out.println("Specify the number of clusters K : ");
+		try {
+			line = br.readLine();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		Nclusters = Integer.parseInt(line);
+		
+		/* record start time*/
+		start_time = System.currentTimeMillis();
 
-		pointDimension = readFile(filename); // return the dimension of point
+		try {
+			output = new PrintWriter("result.txt");
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+		
+		// read file and return the dimension of point
+		pointDimension = readFile(filename);
+		
+		// check if it might get error
+		if(Nclusters > points.size()){
+			System.out.println("number of clusters K must smaller or equal to the number of points in the file" + filename);
+			System.exit(0);
+		}
+		
+		// select K points randomly as the initial centroids
+		SelectPoints();
+		
+		// start clustering
+		clustering();
+		
+		// output result clustering
+		outputCluster();
+		
+		output.close();
+		finish_time = System.currentTimeMillis();
+		System.out.println("total time : " + (finish_time-start_time)/1000.0 + " seconds");
+	}
+	
+	static void outputCluster(){
+		for(int i=0;i<clusterResult.size();i++){
+			output.println("[cluster" + (i+1) + "]");
+			for(int j=0;j<clusterResult.get(i).size();j++){
+				outputPoint(clusterResult.get(i).get(j));
+			}
+		}
+	}
+	
+	static void outputPoint(point p1){
+		output.print(p1.ID + ", ");
+		for(int i=0;i<pointDimension;i++){
+			output.print(p1.pos[i] + " ");
+		}
+		output.println();
+	}
+	
+	static void clustering(){
+		int count = 1;
+		int index;
+		double dis;
+		double[] sum = new double[6];
+		boolean flag;
+		
+		while(true){
+			System.out.println("round " + count);
+			count++;
+			
+			clusterResult = new ArrayList<List<point>>();
+			for(int i=0;i<centroids.size();i++){
+				clusterResult.add(new ArrayList<point>());
+			}
+			for(int i=0;i<points.size();i++){
+				index = 0;
+				dis = distance(points.get(i), centroids.get(0));
+				for(int j=1;j<centroids.size();j++){
+					if(distance(points.get(i), centroids.get(j)) < dis){
+						index = j;
+						dis = distance(points.get(i), centroids.get(j));
+					}
+				}
+				clusterResult.get(index).add(points.get(i));
+			}
+			
+			
+			// calculate new centroid
+			newCentroids.clear();
+			for(int i=0;i<centroids.size();i++){
+				sum[0] = sum[1] = sum[2] = sum[3] = sum[4] = sum[5] = 0.0;
+				for(int j=0;j<clusterResult.get(i).size();j++){
+					sum[0] += clusterResult.get(i).get(j).pos[0];
+					sum[1] += clusterResult.get(i).get(j).pos[1];
+					sum[2] += clusterResult.get(i).get(j).pos[2];
+					sum[3] += clusterResult.get(i).get(j).pos[3];
+					sum[4] += clusterResult.get(i).get(j).pos[4];
+					sum[5] += clusterResult.get(i).get(j).pos[5];
+				}
+				newCentroids.add(new point(0, 
+						(int)(sum[0]/clusterResult.get(i).size()), 
+						(int)(sum[1]/clusterResult.get(i).size()), 
+						(int)(sum[2]/clusterResult.get(i).size()), 
+						(int)(sum[3]/clusterResult.get(i).size()), 
+						(int)(sum[4]/clusterResult.get(i).size()), 
+						(int)(sum[5]/clusterResult.get(i).size()))
+				);
+			}
+			
+			// check if the centroid is almost unchanged
+			flag = true;
+			for(int i=0;i<centroids.size();i++){
+				if(distance(centroids.get(i), newCentroids.get(i)) > 5.0){
+					flag = false;
+					break;
+				}
+			}
+			if(flag){
+				break;
+			}
+			else{
+				centroids = new ArrayList<point>();
+				for(int i=0;i<newCentroids.size();i++){
+					centroids.add(newCentroids.get(i));
+				}
+			}
+			
+		}
+	}
+	
+	static double distance(point p1, point p2){
+		double counter = 0.0;
+		int sub;
+		
+		for(int i=0;i<pointDimension;i++){
+			sub = p1.pos[i] - p2.pos[i];
+			counter += sub * sub;
+		}
+		
+		return Math.sqrt(counter);
+	}
+	
+	static void SelectPoints(){
+		List<Integer> selectID = new ArrayList<Integer>();
+		int nowN = points.size();
+		int getNumber;
+		
+		for(int i=0;i<nowN;i++){
+			selectID.add(i);
+		}
+		
+		for(int i=0;i<Nclusters;i++){
+			getNumber = selectID.remove((int)(Math.random()*nowN));
+			centroids.add(new point(0, points.get(getNumber).pos[0], points.get(getNumber).pos[1], points.get(getNumber).pos[2], points.get(getNumber).pos[3], points.get(getNumber).pos[4], points.get(getNumber).pos[5]));
+			nowN--;
+		}
 		
 	}
 	
@@ -81,6 +238,7 @@ public class Kmeans {
 		        	continue;
 		        }
 		    }
+			br.close();
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
